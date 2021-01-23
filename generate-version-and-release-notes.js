@@ -15,37 +15,17 @@ const changelogFile = "CHANGELOG.md";
 let newVersion = {};
 
 newVersion.date = new Date();
-log("DATE", newVersion.date);
-
 newVersion.branch = getCurrentBranch();
-log("BRANCH", newVersion.branch);
-
 const lines = getLastCommitAsSeparatedLines();
-logLastCommit(lines);
-
 newVersion.commit = getCommit(lines);
-log("COMMIT", newVersion.commit);
-
 newVersion.author = getAuthor(lines);
-log("AUTHOR", newVersion.author);
-
 newVersion.changes = getChanges(lines);
-log("CHANGES", newVersion.changes);
-
 newVersion.approvals = getApprovals(lines);
-log("APPROVAL(s)", newVersion.approvals);
-
 let versionFileContent = getJsonObject(versionFile);
 let previousVersion = getPreviousVersionAsText(versionFileContent);
-log("PREVIOUS VERSION", previousVersion);
-
 newVersion.version = getUpdatedVersion(previousVersion, newVersion.changes);
-log("NEW VERSION", newVersion.version);
-
 updateVersionFile(versionFileContent);
-
 updateChangelogFile(newVersion);
-
 commitAndTag(newVersion.version);
 
 // --------------------- //
@@ -60,12 +40,7 @@ function cleanLine(text) {
         .replace(`${breakPreffix}: `, breakPreffix);
 }
 
-function log(header, jsonObject) {
-    console.log(`${header} = ${asPrettyJson(jsonObject)}`);
-}
-
 function getJsonObject(filePath) {
-    console.log(`getting json object from ${filePath} ...`);
     return JSON.parse(fs.readFileSync(filePath));
 }
 
@@ -162,12 +137,6 @@ function getCurrentBranch() {
         .trim();
 }
 
-function logLastCommit(lines) {
-    console.log("READ PREVIOUS COMMIT -----");
-    lines.forEach(line => console.log(line));
-    console.log("----- END OF PREVIOUS COMMIT");
-}
-
 function isApprovalLine(line) {
     return line.trim().startsWith(`${approvedByPreffix} `);
 }
@@ -204,7 +173,6 @@ function updateVersionFile(versionFileContent) {
     for (let index = 0; index < versionFileContent.versions.length; index++) {
         newVersions.push(versionFileContent.versions[index]);
     }
-    console.log(`writing versions to version.json file ...`);
     fs.writeFileSync(versionFile, asPrettyJson({
         versions: newVersions
     }));
@@ -239,9 +207,6 @@ function updateChangelogFile(newVersion) {
         [`${newVersion.approvals.join(", ")}\n`]);
     changelog += "- - -\n";
     changelog += "- - -\n";
-    console.log("MARKDOWN ADDITION: -----\n");
-    console.log(changelog);
-    console.log("----- END OF MARKDOWN ADDITION");
     let previousChangelog = "";
     try {
         previousChangelog = fs.readFileSync(changelogFile, "utf-8");
