@@ -4,51 +4,10 @@ const fs = require("fs");
 const featPreffix = "feat:";
 const fixPreffix = "fix:";
 const breakPreffix = "break:";
-const approvedByPreffix = "Approved-by:";
 const versionFile = "version.json";
 const changelogFile = "CHANGELOG.md";
 
-// ------------------ //
-// ----- SCRIPT ----- //
-// ------------------ //
-
-let newVersion = {};
-
-newVersion.date = new Date();
-newVersion.branch = getCurrentBranch();
-const lines = getLastCommitAsSeparatedLines();
-newVersion.commit = getCommit(lines);
-newVersion.author = getAuthor(lines);
-newVersion.changes = getChanges(lines);
-newVersion.approvals = getApprovals(lines);
-let versionFileContent = getJsonObject(versionFile);
-let previousVersion = getPreviousVersionAsText(versionFileContent);
-newVersion.version = getUpdatedVersion(previousVersion, newVersion.changes);
-updateVersionFile(versionFileContent);
-updateChangelogFile(newVersion);
-commitAndTag(newVersion.version);
-
-// --------------------- //
-// ----- FUNCTIONS ----- //
-// --------------------- //
-function cleanLine(text) {
-    return text
-        .trim()
-        .replace("* ", "")
-        .replace(`${featPreffix}: `, featPreffix)
-        .replace(`${fixPreffix}: `, fixPreffix)
-        .replace(`${breakPreffix}: `, breakPreffix);
-}
-
-function getJsonObject(filePath) {
-    return JSON.parse(fs.readFileSync(filePath));
-}
-
-function asPrettyJson(jsonObject) {
-    return JSON.stringify(jsonObject, null, 4);
-}
-
-function updateChangelogWith(changelog, title, changeContents) {
+const updateChangelogWith = (changelog, title, changeContents) => {
     if (changeContents.length > 0) {
         changelog += `${title}`;
         changeContents.forEach(content => {
@@ -57,16 +16,12 @@ function updateChangelogWith(changelog, title, changeContents) {
     }
     return changelog;
 }
-
-function getUpdatedVersion(version, changes) {
+const getUpdatedVersion = (version, changes) => {
     let versionFileContent = version.split(".");
     let major = parseInt(versionFileContent[0], 10);
     let minor = parseInt(versionFileContent[1], 10);
     let patch = parseInt(versionFileContent[2], 10);
-    let secondary = 0;
-    if (versionFileContent.length > 3) {
-        secondary = parseInt(versionFileContent[3], 10);
-    }
+    let secondary = parseInt(versionFileContent[3], 10);
 
     let newMajor = 0;
     let newMinor = 0;
@@ -96,89 +51,33 @@ function getUpdatedVersion(version, changes) {
 
     return `${newMajor}.${newMinor}.${newPatch}.${newSecondary}`;
 }
-
-function getChange(line) {
-    if (line.startsWith(featPreffix)) {
-        return {
-            type: featPreffix.replace(":", ""),
-            content: line.replace(featPreffix, "").trim()
-        };
-    } else if (line.startsWith(fixPreffix)) {
-        return {
-            type: fixPreffix.replace(":", ""),
-            content: line.replace(fixPreffix, "").trim()
-        };
-    } else if (line.startsWith(breakPreffix)) {
-        return {
-            type: breakPreffix.replace(":", ""),
-            content: line.replace(breakPreffix, "").trim()
-        };
-    } else {
-        return {
-            type: "none",
-            content: line.trim()
-        };
-    }
-}
-
-function getAuthor(lines) {
-    return lines[1].replace("Author: ", "").trim();
-}
-
-function getCommit(lines) {
-    return lines[0].split(" ")[1];
-}
-
-function getCurrentBranch() {
-    return child.execSync(`git status`)
-        .toString("utf-8")
-        .split("\n")[0]
-        .replace("On branch ", "")
-        .trim();
-}
-
-function isApprovalLine(line) {
-    return line.trim().startsWith(`${approvedByPreffix} `);
-}
-
-function getChanges(lines) {
-    return lines
-        .filter((line, index, arr) => index >= 8 && !isApprovalLine(line))
-        .map(line => cleanLine(line))
-        .filter(line => line.length > 0)
-        .map(line => getChange(line));
-}
-
-function getApprovals(lines) {
-    return lines
-        .filter(line => isApprovalLine(line))
-        .map(line => line
-            .replace(`${approvedByPreffix} `, "")
-            .trim());
-}
-
-function getPreviousVersionAsText(versionFileContent) {
-    let previousVersion = "";
-    if (versionFileContent.versions.length > 0) {
-        previousVersion = versionFileContent.versions[0].version;
-    } else {
-        previousVersion = "0.0.0.0";
-    }
-    return previousVersion;
-}
-
-function updateVersionFile(versionFileContent) {
-    let newVersions = [];
-    newVersions.push(newVersion);
-    for (let index = 0; index < versionFileContent.versions.length; index++) {
-        newVersions.push(versionFileContent.versions[index]);
-    }
-    fs.writeFileSync(versionFile, asPrettyJson({
-        versions: newVersions
-    }));
-}
-
-function updateChangelogFile(newVersion) {
+const getChanges = lines => lines
+    .filter(line => line.startsWith("* "))
+    .map(line => line.replace("* ", "").trim())
+    .map(line => {
+        if (line.startsWith(featPreffix)) {
+            return {
+                type: featPreffix.replace(":", ""),
+                content: line.replace(featPreffix, "").trim()
+            };
+        } else if (line.startsWith(fixPreffix)) {
+            return {
+                type: fixPreffix.replace(":", ""),
+                content: line.replace(fixPreffix, "").trim()
+            };
+        } else if (line.startsWith(breakPreffix)) {
+            return {
+                type: breakPreffix.replace(":", ""),
+                content: line.replace(breakPreffix, "").trim()
+            };
+        } else {
+            return {
+                type: "none",
+                content: line.trim()
+            };
+        }
+    });
+const updateChangelogFile = newVersion => {
     let changelog = `# :confetti_ball: ${newVersion.version} (${newVersion.date})\n`;
     changelog += "- - -\n";
     changelog = updateChangelogWith(
@@ -201,22 +100,15 @@ function updateChangelogFile(newVersion) {
         changelog,
         "###### :construction_worker: Author: ",
         [`${newVersion.author}\n`]);
-    changelog = updateChangelogWith(
-        changelog,
-        "###### :thumbsup: Approval(s): ",
-        [`${newVersion.approvals.join(", ")}\n`]);
     changelog += "- - -\n";
     changelog += "- - -\n";
     let previousChangelog = "";
-    try {
+    if (fs.existsSync(changelogFile)) {
         previousChangelog = fs.readFileSync(changelogFile, "utf-8");
-    } catch (error) {
-        previousChangelog = "";
     }
     fs.writeFileSync(changelogFile, `${changelog}${previousChangelog}`);
 }
-
-function commitAndTag(newVersionAsText) {
+const commitAndTag = (newVersionAsText) => {
     child.execSync(`git add ${versionFile}`);
     child.execSync(`git add ${changelogFile}`);
     child.execSync(`git commit -m "[SKIP CI] Bump to version ${newVersionAsText}"`);
@@ -224,8 +116,27 @@ function commitAndTag(newVersionAsText) {
     child.execSync(`git push --follow-tags`);
 }
 
-function getLastCommitAsSeparatedLines() {
-    return child.execSync("git log -1 --format=full")
-        .toString("utf-8")
-        .split("\n");
+////////// SCRIPT //////////
+let newVersion = {};
+newVersion.date = new Date();
+newVersion.branch = child.execSync(`git status`)
+    .toString("utf-8")
+    .split("\n")[0]
+    .replace("On branch ", "")
+    .trim();
+const lines = child.execSync("git log -1 --format=full")
+    .toString("utf-8")
+    .split("\n");
+newVersion.commit = lines[0].split(" ")[1];
+newVersion.author = lines[1].replace("Author: ", "").trim();
+newVersion.changes = getChanges(lines);
+let previousVersion = "0.0.0.0";
+if (fs.existsSync(versionFile)) {
+    previousVersion = JSON.parse(fs.readFileSync(versionFile));
 }
+newVersion.version = getUpdatedVersion(previousVersion, newVersion.changes);
+fs.writeFileSync(versionFile, JSON.stringify({
+    current: newVersion.version
+}, null, 4));
+updateChangelogFile(newVersion);
+commitAndTag(newVersion.version);
